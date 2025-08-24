@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "parallel-web": "github:shapleyai/parallel-sdk-internal-typescript"
+  }
+}
