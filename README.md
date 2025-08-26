@@ -24,3 +24,7 @@ Technology Stack we'll use:
 - Search Processors Docs: https://docs.parallel.ai/search-api/processors
 - How to use Cloudflare: https://flaredream.com/system-ts.md
 - How to use agents in AI SDK: https://uithub.com/vercel/ai/blob/main/content/docs/02-foundations/06-agents.mdx
+
+# Blogpost
+
+Coming soon
