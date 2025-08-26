@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Research Agent</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         @font-face {
             font-family: 'FT System Mono';
@@ -78,6 +79,90 @@
             100% {
                 transform: rotate(360deg);
             }
+        }
+
+        /* Markdown styles */
+        .markdown-content {
+            line-height: 1.6;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+
+        .markdown-content h1 {
+            font-size: 1.5em;
+        }
+
+        .markdown-content h2 {
+            font-size: 1.3em;
+        }
+
+        .markdown-content h3 {
+            font-size: 1.1em;
+        }
+
+        .markdown-content p {
+            margin-bottom: 1em;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-bottom: 1em;
+            padding-left: 1.5em;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.25em;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid #d8d0bf;
+            padding-left: 1em;
+            margin: 1em 0;
+            font-style: italic;
+            color: #666;
+        }
+
+        .markdown-content code {
+            background-color: #f5f5f5;
+            padding: 0.125em 0.25em;
+            border-radius: 0.25em;
+            font-family: 'FT System Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 0.5em;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .markdown-content a {
+            color: #fb631b;
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-content strong {
+            font-weight: 500;
         }
     </style>
 </head>
@@ -168,6 +253,12 @@
         const systemPromptTextarea = document.getElementById('system-prompt');
         const saveConfigBtn = document.getElementById('save-config');
         const cancelConfigBtn = document.getElementById('cancel-config');
+
+        // Configure marked options
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
 
         // Event Listeners
         searchBtn.addEventListener('click', startResearch);
@@ -314,7 +405,8 @@
                     showError(chunk.error);
                     break;
                 case 'finish':
-                    // Research completed
+                    // Research completed - finalize current text element
+                    finalizeCurrentText();
                     console.log('Research completed');
                     break;
             }
@@ -327,15 +419,39 @@
             if (!currentTextElement) {
                 currentTextElement = document.createElement('div');
                 currentTextElement.className = 'current-text bg-white border border-gray-200 rounded-lg p-4 mb-4 search-result';
-                currentTextElement.innerHTML = '<div class="prose prose-sm max-w-none whitespace-pre-wrap"></div>';
+
+                // Create the markdown content container
+                const markdownContainer = document.createElement('div');
+                markdownContainer.className = 'markdown-content';
+                currentTextElement.appendChild(markdownContainer);
+
                 resultsContent.appendChild(currentTextElement);
             }
 
-            const textContainer = currentTextElement.querySelector('div');
-            textContainer.textContent += text;
+            // Store the raw text
+            if (!currentTextElement.rawText) {
+                currentTextElement.rawText = '';
+            }
+            currentTextElement.rawText += text;
+
+            // Render markdown
+            const textContainer = currentTextElement.querySelector('.markdown-content');
+            if (textContainer) {
+                textContainer.innerHTML = marked.parse(currentTextElement.rawText);
+            }
+        }
+
+        function finalizeCurrentText() {
+            const currentTextElement = resultsContent.querySelector('.current-text');
+            if (currentTextElement) {
+                currentTextElement.classList.remove('current-text');
+            }
         }
 
         function addToolCall(toolCall) {
+            // Finalize any current text element before adding tool call
+            finalizeCurrentText();
+
             const toolCallElement = document.createElement('div');
             toolCallElement.className = 'tool-call p-4 rounded-lg mb-4 search-result';
 
@@ -363,20 +479,19 @@
 
             const output = toolResult.result || toolResult.output;
             if (output && output.results && Array.isArray(output.results)) {
-                output.results.forEach((result, index) => {
-                    const excerpts = Array.isArray(result.excerpts) ? result.excerpts : [];
-                    const previewText = excerpts.slice(0, 2).join(' ').substring(0, 200);
-
+                output.results.slice(0, 5).forEach((result, index) => {
                     resultsHtml += `
-                        <div class="mb-3 pb-3 ${index < output.results.length - 1 ? 'border-b border-gray-200' : ''}">
+                        <div class="mb-3 pb-3 ${index < Math.min(output.results.length, 5) - 1 ? 'border-b border-gray-200' : ''}">
                             <div class="font-medium text-blue-600 mb-1">
                                 <a href="${result.url}" target="_blank" class="hover:underline text-sm">${result.title}</a>
                             </div>
-                            <div class="text-xs text-gray-500 mb-2 truncate">${result.url}</div>
-                            ${previewText ? `<div class="text-sm text-gray-700">${previewText}${previewText.length >= 200 ? '...' : ''}</div>` : ''}
+                            <div class="text-xs text-gray-500 truncate">${result.url}</div>
                         </div>
                     `;
                 });
+                if (output.results.length > 5) {
+                    resultsHtml += `<div class="text-xs text-gray-500 text-center pt-2">+ ${output.results.length - 5} more results</div>`;
+                }
             } else {
                 resultsHtml += '<div class="text-sm text-gray-500">No detailed results available</div>';
             }
@@ -387,6 +502,8 @@
 
         function showError(error) {
             showResults(); // Make sure results interface is visible
+            finalizeCurrentText(); // Finalize any current text
+
             const errorElement = document.createElement('div');
             errorElement.className = 'bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 search-result';
             errorElement.innerHTML = `<div class="flex items-center"><div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div><strong>Error:</strong> ${error}</div>`;

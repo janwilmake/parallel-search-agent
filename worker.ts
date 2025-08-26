@@ -48,30 +48,37 @@ export default {
 
         // Define the search tool
         const searchTool = tool({
-          description:
-            "Search the web for information using Parallel's AI-native search API. Use this tool multiple times with different queries to gather comprehensive information.",
+          description: `# Web Search Tool - Simplified
+
+**Purpose:** Perform web searches and return LLM-friendly results.
+
+**Usage:**
+- objective: Natural-language description of your research goal (max 200 characters)
+  - Specify what you want to learn or find
+  - Include any source preferences or freshness requirements
+  - Focus on the end goal, not implementation details
+
+**Examples:**
+- "Find the latest developments in AI safety research from 2024"
+- "Get current stock price and recent news for Tesla"
+- "Compare features of top 3 project management tools"
+
+**Best Practices:**
+- Be specific about what information you need
+- Mention if you want recent/current data
+- Keep objectives concise but descriptive`,
           inputSchema: z.object({
             objective: z
               .string()
               .describe(
-                "Natural-language description of what you want to find"
+                "Natural-language description of your research goal (max 200 characters)"
               ),
-            search_queries: z
-              .array(z.string())
-              .optional()
-              .describe("Optional search queries to guide the search"),
-            max_results: z
-              .number()
-              .optional()
-              .default(5)
-              .describe("Maximum number of results to return"),
           }),
-          execute: async ({ objective, search_queries, max_results }) => {
+          execute: async ({ objective }) => {
             const searchResult = await parallel.beta.search({
               objective,
-              search_queries,
               processor: "base",
-              max_results,
+              max_results: 5,
               max_chars_per_result: 800, // Keep low to save tokens
             });
 
@@ -81,25 +88,24 @@ export default {
 
         // Stream the research process
         const result = streamText({
-          model: cerebras("llama-3.3-70b"),
+          model: cerebras("gpt-oss-120b"),
           system:
             systemPrompt ||
-            `You are a thorough web research agent. Your task is to:
+            `Use the search tool to access web information. Scale the number of calls based on complexity - single call for simple questions, multiple calls for complex research.
 
-1. Perform comprehensive research on the given topic using multiple targeted searches
-2. Gather information from diverse, reliable sources
-3. Synthesize findings into a well-structured, informative response
-4. Always cite your sources with URLs
-5. Use the search tool multiple times with different angles and queries
+**Key Parameters:**
+- objective: Describe what you're trying to accomplish. This helps the search engine understand intent and provide relevant results.
 
-When researching:
-- Start with broad searches, then narrow down to specific aspects
-- Look for recent information and authoritative sources
-- Cross-reference information across multiple sources
-- Present findings in a clear, organized manner`,
-          prompt: `Research the following topic thoroughly: ${query}
+**Query Tips:**
+- Keep queries concise (1-6 words)
+- Start broad, then narrow down
+- Never repeat similar queries - make each unique
+- If initial results insufficient, reformulate with different angles
 
-Please conduct multiple searches to gather comprehensive information from different angles and sources.`,
+**Usage Pattern:**
+- Simple queries: One call usually sufficient
+- Complex research: Multiple unique queries to gather comprehensive information`,
+          prompt: query,
           tools: {
             search: searchTool,
           },
@@ -114,7 +120,6 @@ Please conduct multiple searches to gather comprehensive information from differ
           async start(controller) {
             try {
               for await (const chunk of result.fullStream) {
-                console.log({ chunk });
                 const data = `data: ${JSON.stringify(chunk)}\n\n`;
                 controller.enqueue(encoder.encode(data));
               }

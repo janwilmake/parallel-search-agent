@@ -24,7 +24,3 @@ Technology Stack we'll use:
 - Search Processors Docs: https://docs.parallel.ai/search-api/processors
 - How to use Cloudflare: https://flaredream.com/system-ts.md
 - How to use agents in AI SDK: https://uithub.com/vercel/ai/blob/main/content/docs/02-foundations/06-agents.mdx
-
-# TODO
-
-- Streaming token by token will likely improve how things look. Ensure that ai sdk context includes tool call details. Then stream
