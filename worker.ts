@@ -1,157 +1,145 @@
 /// <reference types="@cloudflare/workers-types" />
-
-import { generateText, tool, stepCountIs } from "ai";
-import { createCerebras } from "@ai-sdk/cerebras";
 import { Parallel } from "parallel-web";
-import { z } from "zod";
+import { createCerebras } from "@ai-sdk/cerebras";
+import { streamText, tool, stepCountIs } from "ai";
+import { z } from "zod/v4";
+//@ts-ignore
+import indexHtml from "./index.html";
 
 export interface Env {
-  CEREBRAS_API_KEY: string;
   PARALLEL_API_KEY: string;
+  CEREBRAS_API_KEY: string;
 }
 
 export default {
-  async fetch(
-    request: Request,
-    env: Env,
-    ctx: ExecutionContext
-  ): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     // Ensure required environment variables are present
-    if (!env.CEREBRAS_API_KEY) {
-      return new Response("CEREBRAS_API_KEY environment variable is required", {
-        status: 500,
-      });
-    }
-    if (!env.PARALLEL_API_KEY) {
-      return new Response("PARALLEL_API_KEY environment variable is required", {
-        status: 500,
-      });
+    if (!env.PARALLEL_API_KEY || !env.CEREBRAS_API_KEY) {
+      return new Response("Missing required API keys", { status: 500 });
     }
 
     const url = new URL(request.url);
 
-    // Handle CORS preflight requests
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
-      });
-    }
-
-    // Serve static files from assets directory
+    // Serve the HTML page
     if (request.method === "GET" && url.pathname === "/") {
-      // This will be handled by Cloudflare's assets serving
-      return new Response("Static files are served automatically", {
-        status: 404,
+      return new Response(indexHtml, {
+        headers: { "Content-Type": "text/html" },
       });
     }
 
-    // Handle research API endpoint
+    // Handle research requests
     if (request.method === "POST" && url.pathname === "/api/research") {
       try {
-        const { query, systemPrompt } = (await request.json()) as {
-          query: string;
-          systemPrompt?: string;
-        };
+        const { query, systemPrompt } = await request.json<any>();
 
         if (!query) {
           return new Response("Query is required", { status: 400 });
         }
 
-        // Initialize providers
-        const cerebras = createCerebras({
-          apiKey: env.CEREBRAS_API_KEY,
-        });
-
+        // Initialize Parallel client
         const parallel = new Parallel({
           apiKey: env.PARALLEL_API_KEY,
         });
 
-        // Create the web search tool
-        const webSearchTool = tool({
+        // Initialize Cerebras provider
+        const cerebras = createCerebras({
+          apiKey: env.CEREBRAS_API_KEY,
+        });
+
+        // Define the search tool
+        const searchTool = tool({
           description:
-            "Search the web for current information on any topic. Use this tool to find relevant, up-to-date information before answering questions.",
+            "Search the web for information using Parallel's AI-native search API. Use this tool multiple times with different queries to gather comprehensive information.",
           inputSchema: z.object({
             objective: z
               .string()
               .describe(
-                "Natural-language description of what you are looking for"
+                "Natural-language description of what you want to find"
               ),
             search_queries: z
               .array(z.string())
               .optional()
-              .describe("Optional specific search queries to guide the search"),
+              .describe("Optional search queries to guide the search"),
             max_results: z
               .number()
               .optional()
               .default(5)
-              .describe("Maximum number of search results to return"),
+              .describe("Maximum number of results to return"),
           }),
-          execute: async ({ objective, search_queries, max_results = 5 }) => {
+          execute: async ({ objective, search_queries, max_results }) => {
+            const searchResult = await parallel.beta.search({
+              objective,
+              search_queries,
+              processor: "base",
+              max_results,
+              max_chars_per_result: 800, // Keep low to save tokens
+            });
+
+            return searchResult;
+          },
+        });
+
+        // Stream the research process
+        const result = streamText({
+          model: cerebras("llama-3.3-70b"),
+          system:
+            systemPrompt ||
+            `You are a thorough web research agent. Your task is to:
+
+1. Perform comprehensive research on the given topic using multiple targeted searches
+2. Gather information from diverse, reliable sources
+3. Synthesize findings into a well-structured, informative response
+4. Always cite your sources with URLs
+5. Use the search tool multiple times with different angles and queries
+
+When researching:
+- Start with broad searches, then narrow down to specific aspects
+- Look for recent information and authoritative sources
+- Cross-reference information across multiple sources
+- Present findings in a clear, organized manner`,
+          prompt: `Research the following topic thoroughly: ${query}
+
+Please conduct multiple searches to gather comprehensive information from different angles and sources.`,
+          tools: {
+            search: searchTool,
+          },
+          stopWhen: stepCountIs(10),
+          maxOutputTokens: 4000,
+          temperature: 0.3,
+        });
+
+        // Return the streaming response
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
             try {
-              const searchResult = await parallel.beta.search({
-                objective,
-                search_queries,
-                max_results,
-                max_chars_per_result: 2000,
-                processor: "base",
-              });
-
-              // Format the results for the AI
-              const formattedResults = searchResult.results.map(
-                (result, index) => ({
-                  position: index + 1,
-                  title: result.title,
-                  url: result.url,
-                  content: result.excerpts.join(" "),
-                })
-              );
-
-              return {
-                search_id: searchResult.search_id,
-                results: formattedResults,
-                total_results: searchResult.results.length,
-              };
+              for await (const chunk of result.fullStream) {
+                console.log({ chunk });
+                const data = `data: ${JSON.stringify(chunk)}\n\n`;
+                controller.enqueue(encoder.encode(data));
+              }
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             } catch (error) {
-              console.error("Search error:", error);
-              return {
-                error: "Failed to search the web",
-                details:
-                  error instanceof Error ? error.message : "Unknown error",
-              };
+              console.error("Stream error:", error);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "error",
+                    error: error.message,
+                  })}\n\n`
+                )
+              );
+            } finally {
+              controller.close();
             }
           },
         });
 
-        // Generate response using AI with search capability
-        const result = await generateText({
-          model: cerebras("llama-3.3-70b"),
-          system:
-            systemPrompt ||
-            `You are a professional research agent specializing in web research and analysis. Your role is to:
-
-1. Use the web search tool to find relevant, up-to-date information
-2. Analyze multiple sources to provide comprehensive answers
-3. Present information clearly with proper context
-4. Cite sources when making claims
-5. Acknowledge limitations in available information
-
-Always search first before providing answers, and use multiple search queries when needed to get comprehensive information.`,
-          prompt: query,
-          tools: {
-            webSearch: webSearchTool,
-          },
-          stopWhen: stepCountIs(10),
-          maxRetries: 2,
-          temperature: 0.1,
-        });
-
-        return new Response(result.text, {
+        return new Response(stream, {
           headers: {
-            "Content-Type": "text/plain; charset=utf-8",
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
@@ -159,22 +147,13 @@ Always search first before providing answers, and use multiple search queries wh
         });
       } catch (error) {
         console.error("Research error:", error);
-        return new Response(
-          `Research failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-          {
-            status: 500,
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-              "Access-Control-Allow-Headers": "Content-Type",
-            },
-          }
-        );
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
