@@ -1,5 +1,7 @@
 # After hours of iteration, I one-shotted my Search Agent - A short guide about context engineering and building agents
 
+[![janwilmake/parallel-search-agent context](https://badge.forgithub.com/janwilmake/parallel-search-agent)](https://uithub.com/janwilmake/parallel-search-agent)
+
 In this guide, we'll build a Web Research Agent accessible over a simple frontend. By the end of this guide, you'll know how to build a search agent like in [this demo](https://x.com/janwilmake/status/1960652955251589355) (try it out at https://agent.p0web.com as long as there's still Cerebras & Parallel credit left).
 
 Parallel's Search API has a [different take on search](https://parallel.ai/blog/parallel-search-api) that [beats competition](https://parallel.ai/blog/search-api-benchmark) in benchmarks - a more AI native search. The key difference between other Search Agents such as Exa or Tavily, is that it gives all required context in a single API call, whereas other search agents still function the traditional way of search, where it's split up into 2 API calls - one for getting the SERP, one for getting the pages that seem relevant. Parallel smoothens this process and has build a system that finds the most relevant context of all pages immediately, but only the relevant stuff, to reduce context bloat.
