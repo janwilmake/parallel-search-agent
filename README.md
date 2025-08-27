@@ -1,6 +1,6 @@
 # After hours of iteration, I one-shotted my Search Agent - A short guide about context engineering and building agents
 
-[![janwilmake/parallel-search-agent context](https://badge.forgithub.com/janwilmake/parallel-search-agent?lines=false)](https://uithub.com/janwilmake/parallel-search-agent?lines=false) [![](https://remix.forgithub.com/badge)](https://remix.forgithub.com/janwilmake/parallel-search-agent)
+[![janwilmake/parallel-search-agent context](https://badge.forgithub.com/janwilmake/parallel-search-agent?lines=false)](https://uithub.com/janwilmake/parallel-search-agent?lines=false) [![](https://remix.forgithub.com/badge)](https://remix.forgithub.com/janwilmake/parallel-search-agent) | Discuss: [HN Thread](https://news.ycombinator.com/newest) | [X Thread](https://x.com/janwilmake/status/1960669482697023920)
 
 In this guide, we'll build a Web Research Agent accessible over a simple frontend. By the end of this guide, you'll know how to build a search agent like in [this demo](https://x.com/janwilmake/status/1960652955251589355) (try it out at https://agent.p0web.com as long as there's still Cerebras & Parallel credit left).
 
