@@ -37,8 +37,8 @@ Please note:
 - Don't use fetch, rather , use search from the parallel-web typescript SDK
 - use CEREBRAS_API_KEY and PARALLEL_API_KEY in .env
 - use https://assets.p0web.com for branding, and cdn.tailwindcss.com for styling
-- ensure to define inputSchema for the tool, not parameters
-- use createCerebras with the API key to get a cerebras provider
+- ensure to define `inputSchema` for the tool, not `parameters`
+- use `createCerebras` with the API key to get a cerebras provider
 - define the HTML in a separate file
 - use stopWhen: stepCountIs(10)
 - the layout should be simple, with a nice centered search input first, and a result page where the result is rendered after showing loading indicator.
