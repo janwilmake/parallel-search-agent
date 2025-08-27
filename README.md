@@ -59,7 +59,7 @@ In my specification I've listed a few more requirements and contexts, among othe
 
 # Building the app
 
-Just to be clear, I didn't one-shot it at once, it took me many trial and error, and adopting the prompt. But after a few hours of improving context, [this was the prompt that did the job for me](SPEC.md). Remix it using my app LMPIFY using this button [![](https://remix.forgithub.com/badge)](https://remix.forgithub.com/janwilmake/parallel-search-agent)
+Just to be clear, I didn't one-shot it at once, it took me many trial and error, and adopting the prompt. But after a few hours of improving context, [this was the prompt that did the job for me](SPEC.md). Remix it using my app LMPIFY using this button: [![](https://remix.forgithub.com/badge)](https://remix.forgithub.com/janwilmake/parallel-search-agent)
 
 The main things I added iterating where things where there were multiple options and the AI didn't know which one to use. Primarily the Vercel AI SDK was confusing; Claude got confused because it used `cerebras` over `createCerebras` and `parameters` over `inputSchema`, and a few other things.
 
