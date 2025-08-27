@@ -16,7 +16,8 @@ The Search Agent we're building will:
 The Technology Stack we'll use:
 
 - [Parallel Typescript SDK](https://docs.parallel.ai/home)
-- [Vercel AI SDK](https://ai-sdk.dev/docs/introduction) with [Cerebras](https://ai-sdk.dev/providers/ai-sdk-providers/cerebras)
+- [Vercel AI SDK](https://ai-sdk.dev/docs/introduction)
+- [Cerebras](https://ai-sdk.dev/providers/ai-sdk-providers/cerebras) for fast AI responses
 - [Cloudflare Workers](https://workers.cloudflare.com) to deploy it
 
 # Defining our context
